@@ -1,5 +1,8 @@
 package com.example.snippet.service;
 
-public interface MainService {
+import org.springframework.http.ResponseEntity;
 
+public interface MainService {
+	public ResponseEntity<?> compileCode(String code);
+	public ResponseEntity<?> runCode(String code);
 }

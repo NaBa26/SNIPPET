@@ -7,20 +7,18 @@
         </div>
         <div class="intro-text">
           <h1 class="title">SNIPPET</h1>
-          <p class="subtitle">A minimalist online java editor and compiler</p>
+          <p class="subtitle">A minimalist online java editor</p>
         </div>
       </section>
   
       <!-- Editor Component -->
       <Editor />
-      <OutputWindow />
   
     </div>
   </template>
   
   <script setup>
   import Editor from './Editor.vue';
-  import OutputWindow from './OutputWindow.vue';
   </script>
   
   <style scoped>

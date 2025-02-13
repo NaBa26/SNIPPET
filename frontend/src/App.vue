@@ -1,16 +1,16 @@
 <script setup>
-import Main from './components/Main.vue';
-import Footer from './components/Footer.vue';
+import router from './router';
 </script>
 
 <template>
 
   <main>
-    <Main />
+    <router-view name="main" />
+    <router-view name="notfound" />
   </main>
 
   <footer>
-    <Footer />
+    <router-view name="footer" />
   </footer>
 </template>
 
