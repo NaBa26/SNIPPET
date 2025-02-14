@@ -2,25 +2,27 @@
   <section class="editor-section">
     <div class="controls">
       <button @click="runCode" class="btn run-btn">
-        <FontAwesomeIcon :icon="faPlay" /><span class="p-1">RUN</span>
+        <FontAwesomeIcon :icon="faPlay" /><span class="p-2">RUN</span>
       </button>
       <button @click="formatCode" class="btn format-btn">
-        <FontAwesomeIcon :icon="faAlignLeft" /><span class="p-1">FORMAT</span>
+        <FontAwesomeIcon :icon="faAlignLeft" /><span class="p-2">FORMAT</span>
       </button>
       <button @click="clearEditor" class="btn clear-btn">
-        <FontAwesomeIcon :icon="faTimes" /><span class="p-1">CLEAR WINDOW</span>
+        <FontAwesomeIcon :icon="faTimes" /><span class="p-2">CLEAR WINDOW</span>
       </button>
     </div>
+
     <div class="editor-output-container">
+      <!-- Editor Panel -->
       <div class="editor-container">
         <MonacoEditor
           v-model:value="code"
           language="java"
           theme="vs-dark"
-          :width="600"
-          :height="800"
+          :width=600
+          :height=800
           :options="{
-            fontSize: 18,
+            fontSize: 14,
             wordWrap: 'on',
             automaticLayout: true,
             minimap: { enabled: false },
@@ -30,12 +32,18 @@
           }"
         />
       </div>
-      <div class="loading" v-if="loader">
+
       <div class="output-section">
-        <p><strong>Output:</strong></p>
-        <pre :style="{ color: outputColor }">{{ output }}</pre>
+        <div v-if="loader" class="loader-container">
+          <div class="loader"></div>
+          <p>Loading...</p>
+        </div>
+
+        <div v-else>
+          <p><strong>Output:</strong></p>
+          <pre :style="{ color: outputColor }">{{ output }}</pre>
+        </div>
       </div>
-    </div>
     </div>
   </section>
 </template>
@@ -47,30 +55,43 @@ import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 import { faPlay, faTimes, faAlignLeft } from "@fortawesome/free-solid-svg-icons";
 import axios from "axios";
 
-const code = ref(
-  `public class Main {
-    public static void main(String[] args) {
-        System.out.println("Hello World");
-    }
-  }`
-);
+const code = ref(`public class Main {
+  public static void main(String[] args) {
+      System.out.println("Hello World");
+  }
+}`);
 
-const loader=ref(false);
-
+const loader = ref(false);
 const output = ref("");
 const outputColor = ref("white");
 
 const runCode = async () => {
   try {
+    output.value="";
+    loader.value = true;
     const startTime = performance.now();
+
     const response = await axios.post("http://localhost:8080/api/execute", {
       code: code.value
     });
-    const endTime = performance.now();
 
-    const executionTime = endTime - startTime; 
-    output.value=response.data + "\n Time Elapsed: "+executionTime.toFixed(2) +" ms";
+    const endTime = performance.now();
+    const executionTime = (endTime - startTime).toFixed(2);
+
+    if (response.data.status === "Compilation Error" || response.data.status === "Runtime Error") {
+      loader.value=false;
+      outputColor.value = "red";
+      output.value = response.data.error;
+    } else {
+      loader.value=false;
+      outputColor.value = "green";
+      output.value = response.data.output || response.data.message;
+    }
+
+    output.value += `\n\nTime Elapsed: ${executionTime} ms`;
   } catch (error) {
+    loader.value=false;
+    outputColor.value = "red";
     output.value = "Error: " + error.message;
   }
 };
@@ -84,35 +105,39 @@ const formatCode = () => {
 };
 </script>
 
-
 <style scoped>
 .editor-section {
+  display: flex;
+  flex-direction: column;
   padding: 1rem;
   background-color: #1e1e1e;
-  min-height: 30px;
+  min-height: 100vh;
 }
 
 .controls {
   display: flex;
   gap: 10px;
   margin-bottom: 10px;
+  justify-content: center;
 }
 
 .editor-output-container {
   display: flex;
   gap: 20px;
+  flex: 1;
+  justify-content: center;
 }
 
 .editor-container {
-  flex: 1;
+  flex: 0.42;
   border: 1px solid #333;
-  border-radius: 4px;
+  border-radius: 14px;
   overflow: hidden;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
 }
 
 .output-section {
-  width: 600px;
+  flex: 1;
   padding: 1rem;
   background-color: #2e2e2e;
   color: #e0e0e0;
@@ -120,23 +145,49 @@ const formatCode = () => {
   font-family: "Courier New", Courier, monospace;
   font-size: large;
   white-space: pre-wrap;
+  max-width: 600px;
+  position: relative;
+  border-radius: 14px;
+}
+
+.loader-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  color: #f7f7f7;
+}
+
+.loader {
+  border: 6px solid rgba(255, 255, 255, 0.3);
+  border-top: 6px solid #4caf50;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  animation: spin 1s linear infinite;
+  margin-bottom: 10px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 .btn {
-  padding: 6px 12px;
-  font-size: 10px;
+  padding: 10px 20px;
+  font-size: 16px;
   border: none;
-  border-radius: 10px;
+  border-radius: 20px;
   cursor: pointer;
   font-weight: bold;
-  transition: 0.2s;
+  transition: 0.3s;
+  font-size: large;
 }
 
 .run-btn {
   background-color: #4caf50;
   color: white;
-  font-weight: 800;
-  font-size: medium;
 }
 
 .run-btn:hover {
@@ -146,8 +197,6 @@ const formatCode = () => {
 .format-btn {
   background-color: #2196f3;
   color: white;
-  font-weight: 800;
-  font-size: medium;
 }
 
 .format-btn:hover {
@@ -157,15 +206,9 @@ const formatCode = () => {
 .clear-btn {
   background-color: #f44336;
   color: white;
-  font-weight: 800;
-  font-size: medium;
 }
 
 .clear-btn:hover {
   background-color: #780806;
-}
-
-.loading {
-  background-color: yellow;
 }
 </style>

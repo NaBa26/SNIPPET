@@ -1,71 +1,103 @@
 package com.example.snippet.service;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.util.Map;
-import javax.tools.ToolProvider;
-import javax.tools.JavaCompiler;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.util.HashMap;
+import java.util.Map;
 
 @Service
 public class MainServiceImpl implements MainService {
-    
-    public ResponseEntity<?> compileCode(String code) {
-        JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
-        if (compiler == null) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                                 .body("Java compiler not available");
-        }
-        
-        File sourceFile = new File("Main.java");
-        try (FileWriter writer = new FileWriter(sourceFile)) {
-            writer.write(code);
-        } catch (IOException e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                                 .body("Error writing source file: " + e.getMessage());
-        }
-        
-        int result = compiler.run(null, null, null, sourceFile.getPath());
-        if (result == 0) {
-            return ResponseEntity.ok("Compilation successful");
-        } else {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                                 .body("Compilation failed with exit code: " + result);
-        }
-    }
-    
-    public ResponseEntity<?> runCode(String code) {
+
+    private static final String FILE_NAME = "Main.java";
+
+    @Override
+    public ResponseEntity<Map<String, Object>> compileCode(String code) {
+        Map<String, Object> response = new HashMap<>();
+
         try {
-            Process process = new ProcessBuilder("java", "Main")
-                              .redirectErrorStream(true)
-                              .start();
-            
-            // Read the output from the process
-            StringBuilder output = new StringBuilder();
-            try (BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(process.getInputStream()))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    output.append(line).append("\n");
-                }
-            }
-            
-            int exitCode = process.waitFor();
-            return ResponseEntity.ok(
-                Map.of(
-                    "output", output.toString(),
-                    "exitCode", exitCode
-                )
+            Path filePath = Files.write(
+                Path.of("Main.java"), 
+                code.getBytes(), 
+                StandardOpenOption.CREATE, 
+                StandardOpenOption.TRUNCATE_EXISTING
             );
+
+            ProcessBuilder processBuilder = new ProcessBuilder("javac", "Main.java");
+            processBuilder.redirectErrorStream(true);
+            Process process = processBuilder.start();
+
+            InputStream errorStream = process.getErrorStream();
+            String errorOutput = new String(errorStream.readAllBytes());
+
+            process.waitFor();
+
+            if (!errorOutput.isEmpty()) {
+                response.put("status", "Compilation Error");
+                response.put("message", errorOutput);
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+            }
+
+            response.put("status", "Success");
+            response.put("message", "Compilation Successful");
+            return ResponseEntity.ok(response);
+
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                                 .body("Error executing code: " + e.getMessage());
+            response.put("status", "Error");
+            response.put("message", "Error during compilation: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
+
+
+    @Override
+    public ResponseEntity<Map<String, Object>> runCode(String code) {
+        Map<String, Object> response = new HashMap<>();
+
+        try {
+            ResponseEntity<Map<String, Object>> compilationResponse = compileCode(code);
+            if (compilationResponse.getStatusCode() != HttpStatus.OK) {
+                return compilationResponse; 
+            }
+
+            ProcessBuilder processBuilder = new ProcessBuilder("java", "Main");
+            processBuilder.redirectErrorStream(true);
+            Process process = processBuilder.start();
+
+            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            StringBuilder output = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                output.append(line).append("\n");
+            }
+
+            process.waitFor();
+
+            if (process.exitValue() != 0) {
+                response.put("status", "Runtime Error");
+                response.put("message", output.toString());
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+            }
+
+            response.put("status", "Success");
+            response.put("message", "Execution Successful");
+            response.put("output", output.toString());
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            response.put("status", "Error");
+            response.put("message", "Error during execution: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+
+	public static String getFileName() {
+		return FILE_NAME;
+	}
 
 }

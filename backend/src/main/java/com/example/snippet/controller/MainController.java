@@ -1,41 +1,30 @@
 package com.example.snippet.controller;
 
+import com.example.snippet.service.MainService;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
 import java.util.Map;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-
-import com.example.snippet.service.MainService;
-
-
-
-@RestController 
+@RestController
 @RequestMapping("/api")
 public class MainController {
-	
-	@Autowired
-	private final MainService mainService;
 
-	    public MainController(MainService mainService) {
-	    	this.mainService = mainService;
-		}
-	    
-	    @PostMapping("/execute")
-	    public ResponseEntity<?> executeCode(@RequestBody Map<String, String> request) {
-	        String code = request.get("code");
+    private final MainService mainService;
 
-	        ResponseEntity<?> compileResponse = mainService.compileCode(code);
-	        if (!compileResponse.getStatusCode().is2xxSuccessful()) {
-	            return compileResponse; // Return errors if compilation fails
-	        }
+    public MainController(MainService mainService) {
+        this.mainService = mainService;
+    }
 
-	        ResponseEntity<?> runResponse = mainService.runCode(code);
-	        return runResponse;
-	    }
+    @PostMapping("/compile")
+    public ResponseEntity<Map<String, Object>> compileCode(@RequestBody Map<String, String> request) {
+        String code = request.get("code");
+        return mainService.compileCode(code);
+    }
 
-
+    @PostMapping("/execute")
+    public ResponseEntity<Map<String, Object>> executeCode(@RequestBody Map<String, String> request) {
+        String code = request.get("code");
+        return mainService.runCode(code);
+    }
 }

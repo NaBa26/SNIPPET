@@ -1,8 +1,10 @@
 package com.example.snippet.service;
 
+import java.util.Map;
+
 import org.springframework.http.ResponseEntity;
 
 public interface MainService {
-	public ResponseEntity<?> compileCode(String code);
-	public ResponseEntity<?> runCode(String code);
+	public ResponseEntity<Map<String, Object>> compileCode(String code);
+	public ResponseEntity<Map<String, Object>> runCode(String code);
 }
