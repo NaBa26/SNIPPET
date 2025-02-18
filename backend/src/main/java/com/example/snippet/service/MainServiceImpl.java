@@ -16,88 +16,64 @@ public class MainServiceImpl implements MainService {
     private static final String FILE_NAME = "Main.java";
 
     @Override
-    public ResponseEntity<Map<String, Object>> compileCode(String code) {
-        Map<String, Object> response = new HashMap<>();
-
-        try {
-            Path filePath = Files.write(
-                Path.of("Main.java"), 
-                code.getBytes(), 
-                StandardOpenOption.CREATE, 
-                StandardOpenOption.TRUNCATE_EXISTING
-            );
-
-            ProcessBuilder processBuilder = new ProcessBuilder("javac", "Main.java");
-            processBuilder.redirectErrorStream(true);
-            Process process = processBuilder.start();
-
-            InputStream errorStream = process.getErrorStream();
-            String errorOutput = new String(errorStream.readAllBytes());
-
-            process.waitFor();
-
-            if (!errorOutput.isEmpty()) {
-                response.put("status", "Compilation Error");
-                response.put("message", errorOutput);
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-            }
-
-            response.put("status", "Success");
-            response.put("message", "Compilation Successful");
-            return ResponseEntity.ok(response);
-
-        } catch (Exception e) {
-            response.put("status", "Error");
-            response.put("message", "Error during compilation: " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
-        }
-    }
-
-
-    @Override
     public ResponseEntity<Map<String, Object>> runCode(String code) {
         Map<String, Object> response = new HashMap<>();
 
         try {
-            ResponseEntity<Map<String, Object>> compilationResponse = compileCode(code);
-            if (compilationResponse.getStatusCode() != HttpStatus.OK) {
-                return compilationResponse; 
+            Path filePath = Files.write(
+                Path.of(FILE_NAME),
+                code.getBytes(),
+                StandardOpenOption.CREATE,
+                StandardOpenOption.TRUNCATE_EXISTING
+            );
+
+            Process compileProcess = new ProcessBuilder("javac", FILE_NAME).redirectErrorStream(true).start();
+            compileProcess.waitFor();
+
+            String compileErrors = new String(compileProcess.getInputStream().readAllBytes());
+            if (!compileErrors.isEmpty()) {
+                response.put("status", "Compilation Error");
+                response.put("message", compileErrors);
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
             }
 
-            ProcessBuilder processBuilder = new ProcessBuilder("java", "Main");
-            processBuilder.redirectErrorStream(true);
-            Process process = processBuilder.start();
+            Process executeProcess = new ProcessBuilder("java", "Main").redirectErrorStream(true).start();
+            BufferedReader outputReader = new BufferedReader(new InputStreamReader(executeProcess.getInputStream()));
+            BufferedReader errorReader = new BufferedReader(new InputStreamReader(executeProcess.getErrorStream()));
 
-            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
             StringBuilder output = new StringBuilder();
+            StringBuilder errors = new StringBuilder();
             String line;
-            while ((line = reader.readLine()) != null) {
+
+            while ((line = outputReader.readLine()) != null) {
                 output.append(line).append("\n");
             }
+            while ((line = errorReader.readLine()) != null) {
+                errors.append(line).append("\n");
+            }
 
-            process.waitFor();
+            executeProcess.waitFor();
 
-            if (process.exitValue() != 0) {
+            if (!errors.toString().isEmpty()) {
                 response.put("status", "Runtime Error");
-                response.put("message", output.toString());
+                response.put("message", errors.toString());
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
             }
 
             response.put("status", "Success");
             response.put("message", "Execution Successful");
             response.put("output", output.toString());
-            return ResponseEntity.ok(response);
 
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
             response.put("status", "Error");
             response.put("message", "Error during execution: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        } finally {
+            try {
+                Files.deleteIfExists(Path.of(FILE_NAME));
+            } catch (IOException ignored) {
+            }
         }
     }
-
-
-	public static String getFileName() {
-		return FILE_NAME;
-	}
-
 }

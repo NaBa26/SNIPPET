@@ -19,8 +19,8 @@
           v-model:value="code"
           language="java"
           theme="vs-dark"
-          :width=600
-          :height=800
+          :width="600"
+          :height="800"
           :options="{
             fontSize: 14,
             wordWrap: 'on',
@@ -42,6 +42,10 @@
         <div v-else>
           <p><strong>Output:</strong></p>
           <pre :style="{ color: outputColor }">{{ output }}</pre>
+          <br />
+          <br />
+          <br />
+          <span style="color: white; font-size: large">{{ outputVal }}</span>
         </div>
       </div>
     </div>
@@ -54,6 +58,7 @@ import MonacoEditor from "monaco-editor-vue3";
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 import { faPlay, faTimes, faAlignLeft } from "@fortawesome/free-solid-svg-icons";
 import axios from "axios";
+import Swal from "sweetalert2";
 
 const code = ref(`public class Main {
   public static void main(String[] args) {
@@ -64,35 +69,82 @@ const code = ref(`public class Main {
 const loader = ref(false);
 const output = ref("");
 const outputColor = ref("white");
+const outputVal = ref("");
 
 const runCode = async () => {
   try {
-    output.value="";
+    output.value = "";
+    outputVal.value = "";
     loader.value = true;
     const startTime = performance.now();
 
     const response = await axios.post("http://localhost:8080/api/execute", {
-      code: code.value
+      code: code.value,
     });
 
+    loader.value = false;
     const endTime = performance.now();
     const executionTime = (endTime - startTime).toFixed(2);
+    output.value = `Time Elapsed: ${executionTime} ms\n\n`;
 
-    if (response.data.status === "Compilation Error" || response.data.status === "Runtime Error") {
-      loader.value=false;
+    if (response.status === 400) {
       outputColor.value = "red";
-      output.value = response.data.error;
-    } else {
-      loader.value=false;
-      outputColor.value = "green";
-      output.value = response.data.output || response.data.message;
+      output.value += `Compilation Error:\n${response.data.message}`;
+      console.error(response.data.message);
+      return;
     }
 
-    output.value += `\n\nTime Elapsed: ${executionTime} ms`;
+    if (response.status === 500 && response.data.status === "Runtime Error") {
+      outputColor.value = "red";
+      output.value += `Runtime Error:\n${response.data.message}`;
+      console.error(response.data.message);
+      return;
+    }
+
+    if (response.status === 500 && response.data.status === "Error During Execution") {
+      Swal.fire({
+        icon: "error",
+        title: "Execution Error",
+        text: response.data.message,
+        confirmButtonText: "OK"
+      });
+      return;
+    }
+
+    if (response.status === 500 && response.data.status === "Internal Server Error") {
+      Swal.fire({
+        icon: "error",
+        title: "Internal Server Error",
+        text: response.data.message,
+        confirmButtonText: "OK"
+      });
+      return;
+    }
+
+    if (response.data.status === "Error") {
+      Swal.fire({
+        icon: "error",
+        title: "Unknown Error",
+        text: response.data.message,
+        footer: "Please try again later",
+        confirmButtonText: "OK"
+      });
+      return;
+    }
+
+    outputColor.value = "green";
+    output.value += `Execution Successful:\n${response.data.output}`;
+    console.log(response.data.output);
+
   } catch (error) {
-    loader.value=false;
+    loader.value = false;
     outputColor.value = "red";
-    output.value = "Error: " + error.message;
+    Swal.fire({
+      icon: "error",
+      title: "Server Error",
+      text: `Error: ${error.message}`,
+      confirmButtonText: "OK"
+    });
   }
 };
 
@@ -101,8 +153,13 @@ const clearEditor = () => {
 };
 
 const formatCode = () => {
-  alert("Not yet implemented");
+    Swal.fire({
+      icon: "info",
+      title: "This functionality hasn't been implemented yet",
+      confirmButtonText: "OK",
+    });
 };
+
 </script>
 
 <style scoped>
@@ -170,8 +227,12 @@ const formatCode = () => {
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .btn {
